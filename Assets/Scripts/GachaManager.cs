@@ -40,17 +40,29 @@ public class GachaManager : MonoBehaviour
         characterCard.transform.localScale = new Vector3(1, 1, 1);
         Cards card = characterCard.GetComponent<Cards>();
 
-        int rnd = UnityEngine.Random.Range(1, 101);
-        for (int i = 0; i < gacha.Length; i++)
+        int rerolls = 0;
+        do
         {
-            if (rnd <= gacha[i].rate)
+            int rnd = UnityEngine.Random.Range(1, 101);
+            for (int i = 0; i < gacha.Length; i++)
             {
-                card.card = Reward(gacha[i].rarity);
-                // Save the obtained card name in PlayerPrefs
-                SaveCardData(card.card.name);
-                return;
+                if (rnd <= gacha[i].rate)
+                {
+                    card.card = Reward(gacha[i].rarity);
+                    // Save the obtained card name in PlayerPrefs
+                    SaveCardData(card.card.name);
+                    if (card.card.name == "holder")
+                    {
+                        rerolls++;
+                        continue; // Reroll without decreasing coins
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
             }
-        }
+        } while (rerolls > 0);
     }
 
     cardinfo Reward(string rarity)
