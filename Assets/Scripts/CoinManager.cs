@@ -1,20 +1,27 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using TMPro; // Import TMP namespace
+using TMPro;
+using MongoDB.Driver;
+using MongoDB.Bson;
 
 public class CoinManager : MonoBehaviour
 {
-    public TextMeshProUGUI Cointext; // Use TextMeshProUGUI for text
+    public TextMeshProUGUI Cointext;
     public float Totalcoins;
 
     // Key for saving/loading the coin amount
     private const string CoinSaveKey = "TotalCoins";
+    private IMongoCollection<BsonDocument> coinsCollection;
 
     // Called when the script instance is being loaded
     private void Awake()
     {
-        
+        // Connect to MongoDB
+        MongoClient client = new MongoClient("mongodb+srv://Equipo4Neoris:Neoris2024@neorisdb.pndj61t.mongodb.net/?retryWrites=true&w=majority&appName=NeorisDB");
+        IMongoDatabase database = client.GetDatabase("test");
+        coinsCollection = database.GetCollection<BsonDocument>("coins");
+
         LoadCoins();
     }
 
@@ -23,15 +30,14 @@ public class CoinManager : MonoBehaviour
     {
         Totalcoins += 5;
         UpdateCoinText();
-        SaveCoins(); 
+        SaveCoins();
     }
 
-    
     public void DecreaseCoins(float amount)
     {
         Totalcoins -= amount;
         UpdateCoinText();
-        SaveCoins(); 
+        SaveCoins();
     }
 
     private void UpdateCoinText()
@@ -41,21 +47,27 @@ public class CoinManager : MonoBehaviour
 
     private void SaveCoins()
     {
-        PlayerPrefs.SetFloat(CoinSaveKey, Totalcoins);
-        PlayerPrefs.Save(); 
+        // Update the coins in the MongoDB collection
+        var filter = Builders<BsonDocument>.Filter.Empty;
+        var update = Builders<BsonDocument>.Update.Set("coins", Totalcoins);
+        coinsCollection.UpdateOne(filter, update, new UpdateOptions { IsUpsert = true });
     }
 
     // Method to load the saved coin amount
     private void LoadCoins()
     {
-        if (PlayerPrefs.HasKey(CoinSaveKey))
+        // Retrieve the coins from the MongoDB collection
+        var filter = Builders<BsonDocument>.Filter.Empty;
+        var document = coinsCollection.Find(filter).FirstOrDefault();
+
+        if (document != null && document.TryGetValue("coins", out var coins))
         {
-            Totalcoins = PlayerPrefs.GetFloat(CoinSaveKey);
+            Totalcoins = (float)coins.AsDouble;
             UpdateCoinText();
         }
         else
         {
-            Totalcoins = 0; 
+            Totalcoins = 0;
             SaveCoins();
         }
     }
