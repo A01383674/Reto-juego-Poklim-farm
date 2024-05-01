@@ -10,30 +10,23 @@ public class GachaManager : MonoBehaviour
     [SerializeField] private Transform parent, pos;
     [SerializeField] private GameObject characterCardGO;
     CoinManager coinManager; // Reference to CoinManager script
+    private IMongoCollection<BsonDocument> cardCountsCollection;
 
     private static Dictionary<string, int> cardCounts = new Dictionary<string, int>();
-
-    private MongoClient mongoClient;
-    private IMongoDatabase database;
-    private IMongoCollection<BsonDocument> usersCollection;
 
     private void Start()
     {
         coinManager = FindObjectOfType<CoinManager>();
 
-        // Connect to MongoDB
-        mongoClient = new MongoClient("mongodb+srv://Equipo4Neoris:Neoris2024@neorisdb.pndj61t.mongodb.net/?retryWrites=true&w=majority&appName=NeorisDB");
-        database = mongoClient.GetDatabase("test");
-        usersCollection = database.GetCollection<BsonDocument>("slimes");
-
-        // Get the user's slime count from the database
-        int slimeCount = GetSlimeCountFromDatabase();
-
-        // Set the count of the cards to the slime count
-        SetCardCount("Slime", slimeCount);
-
         // Load existing card counts from PlayerPrefs
         LoadCardCountsFromPlayerPrefs();
+
+        // Connect to the MongoDB database
+        MongoClient client = new MongoClient("mongodb+srv://Equipo4Neoris:Neoris2024@neorisdb.pndj61t.mongodb.net/?retryWrites=true&w=majority&appName=NeorisDB");
+        IMongoDatabase database = client.GetDatabase("test");
+
+        // Get the card counts collection
+        cardCountsCollection = database.GetCollection<BsonDocument>("card_counts");
     }
 
     private void LoadCardCountsFromPlayerPrefs()
@@ -47,45 +40,24 @@ public class GachaManager : MonoBehaviour
         }
     }
 
-    private int GetSlimeCountFromDatabase()
-    {
-        // Query the database to get the user's slime count
-        var filter = Builders<BsonDocument>.Filter.Eq("username", "your_username");
-        var projection = Builders<BsonDocument>.Projection.Include("slimeCount");
-        var result = usersCollection.Find(filter).Project(projection).FirstOrDefault();
-
-        if (result != null && result.Contains("slimeCount"))
-        {
-            return result["slimeCount"].AsInt32;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-
-    private void SetCardCount(string cardName, int count)
-    {
-        // Set the count of the specified card
-        cardCounts[cardName] = count;
-    }
-
     public static void Gacha()
     {
         GachaManager instance = FindObjectOfType<GachaManager>();
         if (instance != null && instance.coinManager != null && instance.coinManager.Totalcoins >= 5)
         {
-            bool cardCreated = instance.CreateCharacterCard(); // Attempt to create a character card
-
-            // If no card is created, reroll without decreasing coins
+            bool cardCreated = false;
+            while (!cardCreated && instance.coinManager.Totalcoins >= 5)
+            {
+                cardCreated = instance.CreateCharacterCard(); // Attempt to create a character card
+                if (cardCreated)
+                {
+                    // Decrease 5 coins from the user's total coins
+                    instance.coinManager.DecreaseCoins(5);
+                }
+            }
             if (!cardCreated)
             {
-                Gacha(); // Reroll without decreasing coins
-            }
-            else
-            {
-                // Decrease 5 coins from the user's total coins
-                instance.coinManager.DecreaseCoins(5);
+                Debug.Log("Failed to obtain a card after multiple attempts.");
             }
         }
         else
@@ -94,6 +66,7 @@ public class GachaManager : MonoBehaviour
         }
     }
 
+
     bool CreateCharacterCard()
     {
         GameObject characterCard = Instantiate(characterCardGO, pos.position, Quaternion.identity) as GameObject;
@@ -101,10 +74,14 @@ public class GachaManager : MonoBehaviour
         characterCard.transform.localScale = new Vector3(1, 1, 1);
         Cards card = characterCard.GetComponent<Cards>();
 
-        int rnd = UnityEngine.Random.Range(1, 101);
+        int rnd = UnityEngine.Random.Range(0, 101); // Generate random number between 0 and 100 (inclusive)
+        int cumulativeRate = 0;
+
+        // Iterate over gacha rates to find the appropriate rarity based on the random number
         for (int i = 0; i < gacha.Length; i++)
         {
-            if (rnd <= gacha[i].rate)
+            cumulativeRate += gacha[i].rate;
+            if (rnd <= cumulativeRate)
             {
                 card.card = Reward(gacha[i].rarity);
                 // Save the obtained card name in PlayerPrefs
@@ -116,6 +93,7 @@ public class GachaManager : MonoBehaviour
 
         Destroy(characterCard); // Destroy the card if not created successfully
         return false; // Card not created
+
     }
 
     cardinfo Reward(string rarity)
@@ -152,6 +130,11 @@ public class GachaManager : MonoBehaviour
         PlayerPrefs.SetInt(cardName + "_Count", cardCounts[cardName]);
         PlayerPrefs.Save();
 
+        // Update the count in the MongoDB database
+        var filter = Builders<BsonDocument>.Filter.Eq("cardName", cardName);
+        var update = Builders<BsonDocument>.Update.Set("count", cardCounts[cardName]);
+        cardCountsCollection.UpdateOne(filter, update, new UpdateOptions { IsUpsert = true });
+
         Debug.Log("Card Count: " + cardName + " = " + cardCounts[cardName]);
     }
 
@@ -166,12 +149,5 @@ public class GachaManager : MonoBehaviour
         {
             return 0;
         }
-    }
-    private void UpdateSlimeCountInDatabase(int newSlimeCount)
-    {
-        // Update the user's slime count in the database
-        var filter = Builders<BsonDocument>.Filter.Eq("username", "your_username");
-        var update = Builders<BsonDocument>.Update.Set("slimeCount", newSlimeCount);
-        usersCollection.UpdateOne(filter, update);
     }
 }
