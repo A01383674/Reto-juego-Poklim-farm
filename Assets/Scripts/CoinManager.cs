@@ -48,7 +48,7 @@ public class CoinManager : MonoBehaviour
     private void SaveCoins()
     {
         // Update the coins in the MongoDB collection
-        var filter = Builders<BsonDocument>.Filter.Empty;
+        var filter = Builders<BsonDocument>.Filter.Eq("username", "your_username"); ;
         var update = Builders<BsonDocument>.Update.Set("coins", Totalcoins);
         coinsCollection.UpdateOne(filter, update, new UpdateOptions { IsUpsert = true });
     }

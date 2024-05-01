@@ -24,7 +24,7 @@ public class GachaManager : MonoBehaviour
         // Connect to MongoDB
         mongoClient = new MongoClient("mongodb+srv://Equipo4Neoris:Neoris2024@neorisdb.pndj61t.mongodb.net/?retryWrites=true&w=majority&appName=NeorisDB");
         database = mongoClient.GetDatabase("test");
-        usersCollection = database.GetCollection<BsonDocument>("users");
+        usersCollection = database.GetCollection<BsonDocument>("slimes");
 
         // Get the user's slime count from the database
         int slimeCount = GetSlimeCountFromDatabase();
@@ -166,5 +166,12 @@ public class GachaManager : MonoBehaviour
         {
             return 0;
         }
+    }
+    private void UpdateSlimeCountInDatabase(int newSlimeCount)
+    {
+        // Update the user's slime count in the database
+        var filter = Builders<BsonDocument>.Filter.Eq("username", "your_username");
+        var update = Builders<BsonDocument>.Update.Set("slimeCount", newSlimeCount);
+        usersCollection.UpdateOne(filter, update);
     }
 }
