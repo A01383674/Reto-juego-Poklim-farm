@@ -1940,7 +1940,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gacha:
   - rarity: Legendario
-    rate: 7
+    rate: 12
     reward:
     - {fileID: 11400000, guid: 45003a6aca1d64648ae6969c1d4d514c, type: 2}
     - {fileID: 11400000, guid: f15a8ab07df1e054c86bd39135863868, type: 2}
